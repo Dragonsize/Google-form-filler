@@ -1,0 +1,137 @@
+// ==UserScript==
+// @name         Google Form Manual Filler Toggle Popup
+// @namespace    auto.form.click.hotkey
+// @version      7.0
+// @description  Hotkey to toggle popup for filling Google Forms; supports 123, 1 2 3, 1,2,3, ABC, A B C, A,B,C
+// @match        https://docs.google.com/forms/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    function parseInput(val) {
+        val = val.replace(/[\s,]+/g, ''); // remove spaces and commas
+        return val.split('').map(ch => {
+            if (!isNaN(ch)) return parseInt(ch, 10);            // numeric
+            else return ch.toUpperCase().charCodeAt(0) - 64;    // letter A=1, B=2
+        });
+    }
+
+    function addUI() {
+        let box = document.getElementById('gfFillerBox');
+
+        // Toggle
+        if (box) {
+            if (box.style.display === 'none') box.style.display = 'block';
+            else box.style.display = 'none';
+            return;
+        }
+
+        // Create popup
+        box = document.createElement('div');
+        box.id = 'gfFillerBox';
+        box.style.position = 'fixed';
+        box.style.top = '20px';
+        box.style.right = '20px';
+        box.style.zIndex = '9999';
+        box.style.background = 'white';
+        box.style.border = '2px solid #333';
+        box.style.borderRadius = '10px';
+        box.style.padding = '10px 15px';
+        box.style.fontFamily = 'sans-serif';
+        box.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+
+        // Close button
+        const closeBtn = document.createElement('span');
+        closeBtn.textContent = '✖';
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.top = '4px';
+        closeBtn.style.right = '6px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.fontWeight = 'bold';
+        closeBtn.addEventListener('click', () => { box.style.display = 'none'; });
+        box.appendChild(closeBtn);
+
+        // Title
+        const title = document.createElement('b');
+        title.textContent = 'Fill';
+        box.appendChild(title);
+        box.appendChild(document.createElement('br'));
+
+        // Instruction
+        const small = document.createElement('small');
+        small.textContent = 'Enter answers (e.g. 123, 1 2 3, 1,2,3, ABC, A B C, A,B,C)';
+        box.appendChild(small);
+        box.appendChild(document.createElement('br'));
+
+        // Input
+        const input = document.createElement('input');
+        input.id = 'answersInput';
+        input.type = 'text';
+        input.placeholder = '123 or ABC';
+        input.style.width = '160px';
+        input.style.marginTop = '4px';
+        box.appendChild(input);
+        box.appendChild(document.createElement('br'));
+
+        // Fill button
+        const button = document.createElement('button');
+        button.id = 'fillFormBtn';
+        button.textContent = 'Fill Form';
+        button.style.marginTop = '6px';
+        button.style.padding = '3px 8px';
+        box.appendChild(button);
+
+        document.body.appendChild(box);
+
+        button.addEventListener('click', () => {
+            const val = input.value.trim();
+            if (!val) return alert("Enter answers with format 123, 1 2 3, 1,2,3, ABC, A B C, A,B,C");
+            const answers = parseInput(val);
+            fillForm(answers);
+        });
+    }
+
+    function fillForm(answers) {
+        const questions = document.querySelectorAll('div[role="radiogroup"]');
+        const results = [];
+
+        questions.forEach((q, i) => {
+            const options = q.querySelectorAll('[role="radio"]');
+            const choiceIndex = answers[i] - 1;
+
+            if (options[choiceIndex]) {
+                options[choiceIndex].click();
+
+                let label = options[choiceIndex].getAttribute('data-answer-value');
+
+                if (!label) {
+                    // Look for any visible text inside the option
+                    const textEl = options[choiceIndex].querySelector('span, div');
+                    if (textEl) label = textEl.innerText.trim();
+                }
+
+                if (!label) label = `Option ${answers[i]} (fallback)`;
+
+                results.push(`Q${i + 1}: Clicked "${label}"`);
+            } else {
+                results.push(`Q${i + 1}: Option ${answers[i]} not found`);
+            }
+        });
+
+        console.clear();
+        console.log(" Auto-fill complete! Review :\n");
+        results.forEach(r => console.log(r));
+        console.log("\ Review  then submit manually.");
+    }
+
+
+    // Ctrl+Shift+F toggles popup
+    window.addEventListener('keydown', e => {
+        if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') addUI();
+    });
+
+    console.log("Filler loaded. Press Ctrl+Shift+F to toggle input box.");
+    //credit to me naven
+})();
